@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "lib": ["dom", "dom.iterable", "es2020"],
+    "allowJs": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationDir": "./",
+    "isolatedModules": true,
+    "outDir": "./dist",
+    "target": "es6",
+    "skipLibCheck": true,
+    "module": "es2020",
+    "moduleResolution": "node",
+    "noImplicitAny": true,
+    "removeComments": true,
+    "preserveConstEnums": true,
+    "sourceMap": true,
+  },
+  "include": ["src/*.ts"],
+  "exclude": ["/node_modules", "dist", "index.d.ts"]
+}
