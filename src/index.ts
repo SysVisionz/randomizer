@@ -43,8 +43,8 @@ interface Randomizer {
 	result: <V extends ([any, `${string}%`])[], R extends Extract<keyof V, number>>(...values: V) => V[R] extends [any, `${string}%` | number] ? V[R] : V[R]
 }
 
-type RandomizedO<K extends (string | [any, number] | [any, `${number}%`])[]> = {[P in keyof K]: K[P] extends string ? [K[P], 1] : K[P]}
-type RandomizedVals<K extends(string | [any, number] | [any, `${number}%`])[]> = RandomizedO<K>[number][0]
+type RandomizedO<K extends (string | [string, number] | [string, `${number}%`])[]> = {[P in keyof K]: K[P] extends string ? [K[P], 1] : K[P]}
+type RandomizedVals<K extends(string | [string, number] | [string, `${number}%`])[]> = RandomizedO<K>[number][0]
 
 class Randomizer implements Randomizer {
 	constructor(tries?: number)
@@ -214,13 +214,13 @@ class Randomizer implements Randomizer {
 	 * randomized('a', ['d', 6], ['e', 3], [g, '30%'], ['f', '20%'])
 	 * @returns a, d, e, f, or g, with a 20% chance of f, a 30% chance of g, 5% chance of a, 30% chance of d, and 15% chance of e.
 	*/
-	randomized = <K extends (any | [any, number] | [any, `${number}%`])[]> (...vals: K): RandomizedVals<K> | null => {
-		const v: ([any, number ] | [any, `${number}%`])[] = vals.map((val) => {
+	randomized = <K extends (string | [string, number] | [string, `${number}%`])[]> (...vals: K): RandomizedVals<K> | null => {
+		const v: ([string, number ] | [string, `${number}%`])[] = vals.map((val) => {
 			return typeof val === 'string' ? [val, 1] as [any, number] : val
 		})
 		let t = 1;
 
-		const wAndP: [[any, number][], [any, number][]] = v.reduce((split, val) => {
+		const wAndP: [[string, number][], [string, number][]] = v.reduce((split, val) => {
 			if (typeof val[1] === 'string'){
 				const newVal: [any, number] = [val[0], Number(val[1].substring(0, val[1].length-1))/100]
 				t-= newVal[1]
@@ -230,7 +230,7 @@ class Randomizer implements Randomizer {
 				split[0].push(val)
 			}
 			return split
-		}, [[], []] as [[any, number][], [any, number][]])
+		}, [[], []] as [[string, number][], [string, number][]])
 
 		const per = t/wAndP[0].reduce((a, b) => a+b[1], 0)
 
@@ -247,23 +247,26 @@ class Randomizer implements Randomizer {
 		return null
 	}
 	
-	fromOrder<K extends (any | [any, `${number}%`])[]> (vals: K, max: number, floor: number): RandomizedVals<K>
-	fromOrder<K extends (any | [any, `${number}%`])[]> (vals: K, max: number): RandomizedVals<K>
-	fromOrder<K extends (any | [any, `${number}%`])[]> (vals: K): RandomizedVals<K>
-	fromOrder<K extends (any | [any, `${number}%`])[]> (...vals: K): RandomizedVals<K>
-	fromOrder<K extends (any | [any, `${number}%`])[]> (...values: K | [K] | (K | number)[]): RandomizedVals<K> {
-	const [vals, max = 10, floor = max/3 || 1]: [(any | [any, `${number}%`])[], number, number] = values[0] instanceof Array
+	fromOrder<K extends (string | [string, `${number}%`])[]> (vals: K, max: number, floor: number): RandomizedVals<K> | null
+	fromOrder<K extends (string | [string, `${number}%`])[]> (vals: K, max: number): RandomizedVals<K> | null
+	fromOrder<K extends (string | [string, `${number}%`])[]> (vals: K): RandomizedVals<K> | null
+	fromOrder<K extends (string | [string, `${number}%`])[]> (...vals: K): RandomizedVals<K> | null
+	fromOrder<K extends (string | [string, `${number}%`])[]> (...values: K | [K] | (K | number)[]): RandomizedVals<K> | null {
+	const [vals, max = 10, floor = max/3 || 1]: [(string | [string, `${number}%`])[], number, number] = values[0] instanceof Array
 		? values.length === 1
-		|| (values.length === 2 && typeof values[1] === 'number') 
+		|| (values.length === 2 && typeof values[1] === 'number' && !(typeof values[1] === 'string' && (values[1] as string).match(/%$/)))
 		|| (values.length === 3 && typeof values[1] === 'number' && typeof values[2] === 'number')
-			? values as unknown as [(any | [any, `${number}%`])[], number, number]
-			: [values] as unknown as [(any | [any, `${number}%`])[], number, number]
-		: [values] as unknown as [(any | [any, `${number}%`])[], number, number]
-		const toRand = vals.reduce((arr: [any, number | `${number}%`][], val, i) => {
+			? values as unknown as [(string | [string, `${number}%`])[], number, number]
+			: [values] as unknown as [(string | [string, `${number}%`])[], number, number]
+		: [values] as unknown as [(string | [string, `${number}%`])[], number, number]
+		const toRand = vals.reduce((arr: (string | [string, number | `${number}%`])[], val, i) => {
 			if (!val){
 				return arr;
 			}
-			arr.push((val instanceof Array && val.length === 2 && val[1].match(/%$/)) ? val as [any, `${number}%`] : [val, Math.round(((vals.length - i)/vals.length) * (max-floor)) + floor] )
+			arr.push(val instanceof Array 
+				? val as [string, `${number}%`]
+				: [val, Math.round(((vals.length - i)/vals.length) * (max-floor)) + floor]
+			)
 			return arr
 		}, [])
 		return this.randomized<K>(...toRand as K)
