@@ -247,7 +247,18 @@ class Randomizer implements Randomizer {
 		return null
 	}
 	
-	fromOrder = <K extends (any | [any, `${number}%`])[]> (vals: K, max = 10, floor = max/3 || 1): RandomizedVals<K> => {
+	fromOrder<K extends (any | [any, `${number}%`])[]> (vals: K, max: number, floor: number): RandomizedVals<K>
+	fromOrder<K extends (any | [any, `${number}%`])[]> (vals: K, max: number): RandomizedVals<K>
+	fromOrder<K extends (any | [any, `${number}%`])[]> (vals: K): RandomizedVals<K>
+	fromOrder<K extends (any | [any, `${number}%`])[]> (...vals: K): RandomizedVals<K>
+	fromOrder<K extends (any | [any, `${number}%`])[]> (...values: K | [K] | (K | number)[]): RandomizedVals<K> {
+	const [vals, max = 10, floor = max/3 || 1]: [(any | [any, `${number}%`])[], number, number] = values[0] instanceof Array
+		? values.length === 1
+		|| (values.length === 2 && typeof values[1] === 'number') 
+		|| (values.length === 3 && typeof values[1] === 'number' && typeof values[2] === 'number')
+			? values as unknown as [(any | [any, `${number}%`])[], number, number]
+			: [values] as unknown as [(any | [any, `${number}%`])[], number, number]
+		: [values] as unknown as [(any | [any, `${number}%`])[], number, number]
 		const toRand = vals.reduce((arr: [any, number | `${number}%`][], val, i) => {
 			if (!val){
 				return arr;
