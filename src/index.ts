@@ -22,7 +22,6 @@ const nearing = (tries: number, rapidity: number, max: number) => {
 }
 
 interface Randomizer {
-	/** get a random integer between min (inclusive) and max (non inclusive), or a random number between min (inclusive) and max(non-inclusive) */
 	__defaultOptions: SpecialRandomOptions & {decimal?: number, successMinimum?: number}
 	__exponentialTries: number;
 	__linearTries: number;
