@@ -23,7 +23,7 @@ const nearing = (tries: number, rapidity: number, max: number) => {
 
 interface Randomizer {
 	/** get a random integer between min (inclusive) and max (non inclusive), or a random number between min (inclusive) and max(non-inclusive) */
-	
+	__defaultOptions: SpecialRandomOptions & {decimal?: number, successMinimum?: number}
 	__exponentialTries: number;
 	__linearTries: number;
 	__nearingTries: number;
@@ -47,23 +47,31 @@ type RandomizedO<K extends (string | [string, number] | [string, `${number}%`])[
 type RandomizedVals<K extends(string | [string, number] | [string, `${number}%`])[]> = RandomizedO<K>[number][0]
 
 class Randomizer implements Randomizer {
+	constructor(defaultOptions: SpecialRandomOptions & {decimal?: never, successMinimum?: never}, tries?: number)
+	constructor(defaultOptions: SpecialRandomOptions & {decimal: number, successMinimum?: never}, tries?: number)
+	constructor(defaultOptions: SpecialRandomOptions & {decimal?: never, successMinimum: number}, tries?: number)
+	constructor(defaultOptions: SpecialRandomOptions & {decimal?: never, successMinimum?: never}, tries?: {linear: number, nearing: number, exponential: number})
+	constructor(defaultOptions: SpecialRandomOptions & {decimal: number, successMinimum?: never}, tries?: {linear: number, nearing: number, exponential: number})
+	constructor(defaultOptions: SpecialRandomOptions & {decimal?: never, successMinimum: number}, tries?: {linear: number, nearing: number, exponential: number})
 	constructor(tries?: number)
 	constructor(tries?: {linear: number, nearing: number, exponential: number})
-	constructor(tries: number | {linear: number, nearing: number, exponential: number} = 0) {
+	constructor(defaultOptionsOrTries: SpecialRandomOptions & {decimal?: number, successMinimum?: number} | number | {linear: number, nearing: number, exponential: number} = 0, tries: number | {linear: number, nearing: number, exponential: number} = 0) {
+		tries = tries || typeof defaultOptionsOrTries === 'object' && defaultOptionsOrTries !== null && Object.keys(defaultOptionsOrTries).some(v => v.match(/(^linear$|^nearing$|^number$)/)) ? tries : defaultOptionsOrTries as number | {linear: number, nearing: number, exponential: number}
 		this.__exponentialTries = (tries as {linear: number, nearing: number, exponential: number})?.linear || tries as number;
 		this.__linearTries = (tries as {linear: number, nearing: number, exponential: number})?.nearing || tries as number;
 		this.__nearingTries = (tries as {linear: number, nearing: number, exponential: number})?.exponential || tries as number;
 		this.linearIncrease = this.linearIncrease.bind(this)
 		this.nearingIncrease = this.nearingIncrease.bind(this)
 		this.exponentialIncrease = this.exponentialIncrease.bind(this)
+		const defaultOptions = typeof defaultOptionsOrTries === 'object' && defaultOptionsOrTries !== null && Object.keys(defaultOptionsOrTries).some(v => v.match(/(^linear$|^nearing$|^number$)/)) ? defaultOptionsOrTries : {}
+		this.__defaultOptions = defaultOptions as SpecialRandomOptions & {decimal?: number, successMinimum?: number}
 	}
-	__decimalDefault = (min: number, max: number) => !(max - min <= 1 && max % 1 || min % 1) || 0
 
 	r(options?: RandomOptions & {successMinimum?: never, decimal?: never}): number
 	r(options?: RandomOptions & {successMinimum: number, decimal?: never}): boolean
 	r(options?: RandomOptions & {successMinimum?: never, decimal: true | number}): string
-	r({max = 1, min = 0, decimal, successMinimum, resetAbove = successMinimum, resetFunc }: RandomOptions & {successMinimum?: number, decimal?: number | true} = {}) {
-		const num = Math.random() * (max-min) + min
+	r({max = 1, min = 0, decimal, successMinimum = this.__defaultOptions.successMinimum, resetAbove = this.__defaultOptions.resetAbove || successMinimum, resetFunc = this.__defaultOptions.resetFunc }: RandomOptions & {successMinimum?: number, decimal?: number | true} = {}) {
+		const num = Math.random() * (max-min) + min	
 		if (typeof resetAbove === 'number' && num > resetAbove){
 			resetFunc?.()
 		}
@@ -116,7 +124,7 @@ class Randomizer implements Randomizer {
 		*/
 	rapidity?: number,
 	options?: SpecialRandomOptions & {successMinimum: never, decimal: true | number}): string
-	linearIncrease (rapidity = 1, {max = 1, min = 0, decimal, tries = this.__linearTries, successMinimum}: SpecialRandomOptions & {successMinimum?: number, decimal?: true | number} = {}) {
+	linearIncrease (rapidity = 1, {max = this.__defaultOptions.max || 1, min = this.__defaultOptions.min || 0, decimal, tries = this.__defaultOptions.tries || this.__linearTries, successMinimum = this.__defaultOptions.successMinimum}: SpecialRandomOptions & {successMinimum?: number, decimal?: true | number} = {}) {
 		min += (max-min)*rapidity*tries/100;
 		const retval = min >= max ? max : this.r({max, min})
 		return !decimal && typeof successMinimum === 'number' ? retval >= successMinimum
@@ -152,15 +160,25 @@ class Randomizer implements Randomizer {
 			/** decimal places in returned value. This causes the random number to be returned as a string. */
 			decimal: true | number
 		}): string
-	
+	nearingIncrease(
+		options?: SpecialRandomOptions & {successMinimum: number, decimal?: never}
+	): boolean
+	nearingIncrease(
+		options?: SpecialRandomOptions & {successMinimum?: number, decimal: true | number}
+	): string
+	nearingIncrease(
+		options?: SpecialRandomOptions & {successMinimum?: never, decimal?: never}
+	): number
 	nearingIncrease (
 		/** how fast do you want your minimum to increase? It's recommended to keep this below 10. 
 		* @defaultValue 1
 		*/
-	rapidity?: number,
+	rapidityOrOptions?: number | SpecialRandomOptions & {successMinimum?: never, decimal?: never},
 	options?: SpecialRandomOptions & {successMinimum?: never, decimal?: never}): number
 
-	nearingIncrease (rapidity = 1, {max = 1, min = 0, successMinimum, decimal, resetAbove = successMinimum, tries = this.__nearingTries}: SpecialRandomOptions & {successMinimum?: number, decimal?: true | number} = {}) {
+	nearingIncrease (rapidityOrOptions: number | SpecialRandomOptions & {successMinimum?: number, decimal?: true | number} = 1, options: SpecialRandomOptions & {successMinimum?: number, decimal?: true | number} = {}) {
+		const rapidity = typeof rapidityOrOptions === 'number' ? rapidityOrOptions : 1
+		let {max = 1, min = 0, successMinimum, decimal, resetAbove = this.__defaultOptions.successMinimum || successMinimum, tries = this.__defaultOptions.tries || this.__nearingTries} =  typeof rapidityOrOptions === 'number' ? options : rapidityOrOptions
 		min = nearing(tries, rapidity, max)
 		return decimal ? this.r({max, min, decimal, resetAbove, resetFunc: this.reset.nearing}) : successMinimum ? this.r({max, min, successMinimum, resetAbove, resetFunc: this.reset.nearing}) : this.r({max, min, resetAbove, resetFunc: this.reset.nearing})
 	}
@@ -184,15 +202,15 @@ class Randomizer implements Randomizer {
 				*/
 				rapidity?: number,
 				options?: SpecialRandomOptions & {successMinimum: never, decimal: true | number}): string
-	exponentialIncrease (rapidity: number = 1, {max = 1, min = 0, decimal, successMinimum, resetAbove}: SpecialRandomOptions & {successMinimum?: number, decimal?: true | number} = {}) {
+	exponentialIncrease (rapidity: number = 1, {max = this.__defaultOptions.max || 1, min = this.__defaultOptions.min || 0, decimal = this.__defaultOptions.decimal, successMinimum = this.__defaultOptions.successMinimum, resetAbove = this.__defaultOptions.resetAbove }: SpecialRandomOptions & {successMinimum?: number, decimal?: true | number} = {}) {
 		min = (max - min)*(Math.pow(rapidity*this.__exponentialTries, 2))
 		const v = this.r({max, min})
 		this.__exponentialTries++
-		return decimal ? this.r({max, min, decimal, resetAbove, resetFunc: this.reset.nearing}) : successMinimum ? this.r({max, min, successMinimum, resetAbove, resetFunc: this.reset.nearing}) : this.r({max, min, resetAbove, resetFunc: this.reset.nearing})
+		return decimal ? this.r({max, min, decimal, resetAbove, resetFunc: this.reset.nearing }) : successMinimum ? this.r({max, min, successMinimum, resetAbove, resetFunc: this.reset.nearing }) : this.r({max, min, resetAbove, resetFunc: this.reset.nearing })
 		
 	}
 
-	//** This will take two formats. If you supply a value, it will do a coinflip, providing your value on success and null on failure. */
+	/** This will take two formats.If you supply a value that is a array of length 2 with a string that has a string matching a number followed by a % sign, it will provide your value that percentage of the time. Otherwise, it will do a coinflip, providing your value on success and null on failure. */
 	ifRand <K extends [any]> (...vals: K): K | null
 	ifRand <K extends [any, `${number}%`]> (...vals: K): K[0] | null
 	ifRand <K extends [any] | [any, `${number}%`]> (...vals: K): (K[1] extends `${number}%` ? K[0] : K) | null {
@@ -247,25 +265,35 @@ class Randomizer implements Randomizer {
 		return null
 	}
 	
+	/** this is a special randomizer that takes an array and then chooses a value from it based on the order of that array. If you wish to force a value in that array to still appear a particular percentage of the time, you can input that value as an array of [<value>, <Number(percentage) | '<percentage>%'>].
+	 * @param vals - the array of values to be randomized
+	 * @param max - This is the maximum "weight" of the values. Raising this value will make the spread between the percentages of the values more pronounced. @defaultValue 10
+	 * @param floor - This is the minimum "weight" of the values. Lowering this value will make the spread between the percentages of the values more pronounced. @defaultValue max/3 || 1
+	 * @example
+	 * fromOrder(['a', 'b', 'c', 'd', ['e', 30]]) - this will return a 30% chance of e, and then a is most likely, b is less likely, c is less likely than b, d is less likely than c.
+	 */
 	fromOrder<K extends (string | [string, `${number}%`])[]> (vals: K, max: number, floor: number): RandomizedVals<K> | null
 	fromOrder<K extends (string | [string, `${number}%`])[]> (vals: K, max: number): RandomizedVals<K> | null
 	fromOrder<K extends (string | [string, `${number}%`])[]> (vals: K): RandomizedVals<K> | null
 	fromOrder<K extends (string | [string, `${number}%`])[]> (...vals: K): RandomizedVals<K> | null
 	fromOrder<K extends (string | [string, `${number}%`])[]> (...values: K | [K] | (K | number)[]): RandomizedVals<K> | null {
-	const [vals, max = 10, floor = max/3 || 1]: [(string | [string, `${number}%`])[], number, number] = values[0] instanceof Array
+		const [vals, max = 10, floor = max/3 || 1]: [(string | [string, `${number}%`])[], number, number] = values[0] instanceof Array
 		? values.length === 1
 		|| (values.length === 2 && typeof values[1] === 'number' && !(typeof values[1] === 'string' && (values[1] as string).match(/%$/)))
 		|| (values.length === 3 && typeof values[1] === 'number' && typeof values[2] === 'number')
-			? values as unknown as [(string | [string, `${number}%`])[], number, number]
-			: [values] as unknown as [(string | [string, `${number}%`])[], number, number]
+		? values as unknown as [(string | [string, `${number}%`])[], number, number]
+		: [values] as unknown as [(string | [string, `${number}%`])[], number, number]
 		: [values] as unknown as [(string | [string, `${number}%`])[], number, number]
 		const toRand = vals.reduce((arr: (string | [string, number | `${number}%`])[], val, i) => {
-			if (!val){
-				return arr;
-			}
-			arr.push(val instanceof Array 
-				? val as [string, `${number}%`]
-				: [val, Math.round(((vals.length - i)/vals.length) * (max-floor)) + floor]
+		if (max < 1 || max < floor){
+			throw new Error('The maximum value must be greater than 1 and greater than the floor value.')
+		}
+		if (!val){
+			return arr;
+		}
+		arr.push(val instanceof Array 
+			? val as [string, `${number}%`]
+			: [val, Math.round(((vals.length - i)/vals.length) * (max-floor)) + floor]
 			)
 			return arr
 		}, [])
