@@ -11,7 +11,7 @@ export type RandomOptions = {
 
 export type SpecialRandomOptions = RandomOptions & {
 	/** the number of tries so far. By default, this will be maintained within the object, but if it is not persistent you will need to apply it yourself.*/
-	tries?: number
+	tries?: number | {linear?: number, nearing?: number, exponential?: number}
 }
 
 const rt = (n: number, rt: number) => Math.pow(n, 1/rt)
@@ -49,16 +49,16 @@ class Randomizer implements Randomizer {
 	constructor(defaultOptions: SpecialRandomOptions & {decimal?: never, successMinimum?: never}, tries?: number)
 	constructor(defaultOptions: SpecialRandomOptions & {decimal: number, successMinimum?: never}, tries?: number)
 	constructor(defaultOptions: SpecialRandomOptions & {decimal?: never, successMinimum: number}, tries?: number)
-	constructor(defaultOptions: SpecialRandomOptions & {decimal?: never, successMinimum?: never}, tries?: {linear: number, nearing: number, exponential: number})
-	constructor(defaultOptions: SpecialRandomOptions & {decimal: number, successMinimum?: never}, tries?: {linear: number, nearing: number, exponential: number})
-	constructor(defaultOptions: SpecialRandomOptions & {decimal?: never, successMinimum: number}, tries?: {linear: number, nearing: number, exponential: number})
+	constructor(defaultOptions: SpecialRandomOptions & {decimal?: never, successMinimum?: never}, tries?: {linear?: number, nearing?: number, exponential?: number})
+	constructor(defaultOptions: SpecialRandomOptions & {decimal: number, successMinimum?: never}, tries?: {linear?: number, nearing?: number, exponential?: number})
+	constructor(defaultOptions: SpecialRandomOptions & {decimal?: never, successMinimum: number}, tries?: {linear?: number, nearing?: number, exponential?: number})
 	constructor(tries?: number)
-	constructor(tries?: {linear: number, nearing: number, exponential: number})
-	constructor(defaultOptionsOrTries: SpecialRandomOptions & {decimal?: number, successMinimum?: number} | number | {linear: number, nearing: number, exponential: number} = 0, tries: number | {linear: number, nearing: number, exponential: number} = 0) {
-		tries = tries || typeof defaultOptionsOrTries === 'object' && defaultOptionsOrTries !== null && Object.keys(defaultOptionsOrTries).some(v => v.match(/(^linear$|^nearing$|^number$)/)) ? tries : defaultOptionsOrTries as number | {linear: number, nearing: number, exponential: number}
-		this.__exponentialTries = (tries as {linear: number, nearing: number, exponential: number})?.linear || tries as number;
-		this.__linearTries = (tries as {linear: number, nearing: number, exponential: number})?.nearing || tries as number;
-		this.__nearingTries = (tries as {linear: number, nearing: number, exponential: number})?.exponential || tries as number;
+	constructor(tries?: {linear?: number, nearing?: number, exponential?: number})
+	constructor(defaultOptionsOrTries: SpecialRandomOptions & {decimal?: number, successMinimum?: number} | number | {linear?: number, nearing?: number, exponential?: number} = 0, tries: number | {linear?: number, nearing?: number, exponential?: number} = 0) {
+		tries = tries || typeof defaultOptionsOrTries === 'object' && defaultOptionsOrTries !== null && Object.keys(defaultOptionsOrTries).some(v => v.match(/(^linear$|^nearing$|^number$)/)) ? tries : defaultOptionsOrTries as number | {linear?: number, nearing?: number, exponential?: number}
+		this.__exponentialTries = (tries as {linear?: number, nearing?: number, exponential?: number})?.linear || tries as number;
+		this.__linearTries = (tries as {linear?: number, nearing?: number, exponential?: number})?.nearing || tries as number;
+		this.__nearingTries = (tries as {linear?: number, nearing?: number, exponential?: number})?.exponential || tries as number;
 		this.linearIncrease = this.linearIncrease.bind(this)
 		this.nearingIncrease = this.nearingIncrease.bind(this)
 		this.exponentialIncrease = this.exponentialIncrease.bind(this)
@@ -101,6 +101,10 @@ class Randomizer implements Randomizer {
 			}
 		}
 	})
+
+	__getTries(tries: number | {linear?: number, nearing?: number, exponential?: number}): number {
+		return typeof tries === 'number' ? tries : tries.linear || tries.nearing || tries.exponential || 0
+	}
 	
 	/** this creates a random number that increases linearly with each try. */
 	linearIncrease (
@@ -122,9 +126,9 @@ class Randomizer implements Randomizer {
 		* @defaultValue 1
 		*/
 	rapidity?: number,
-	options?: SpecialRandomOptions & {successMinimum: never, decimal: true | number}): string
+	options?: SpecialRandomOptions & {successMinimum?: never, decimal: true | number}): string
 	linearIncrease (rapidity = 1, {max = this.__defaultOptions.max || 1, min = this.__defaultOptions.min || 0, decimal, tries = this.__defaultOptions.tries || this.__linearTries, successMinimum = this.__defaultOptions.successMinimum}: SpecialRandomOptions & {successMinimum?: number, decimal?: true | number} = {}) {
-		min += (max-min)*rapidity*tries/100;
+		min += (max-min)*rapidity*this.__getTries(tries)/100;
 		const retval = min >= max ? max : this.r({max, min})
 		return !decimal && typeof successMinimum === 'number' ? retval >= successMinimum
 				: typeof decimal === 'number' || decimal === true ? retval.toFixed(decimal === true ? 2 : decimal)
@@ -178,7 +182,7 @@ class Randomizer implements Randomizer {
 	nearingIncrease (rapidityOrOptions: number | SpecialRandomOptions & {successMinimum?: number, decimal?: true | number} = 1, options: SpecialRandomOptions & {successMinimum?: number, decimal?: true | number} = {}) {
 		const rapidity = typeof rapidityOrOptions === 'number' ? rapidityOrOptions : 1
 		let {max = 1, min = 0, successMinimum, decimal, resetAbove = this.__defaultOptions.successMinimum || successMinimum, tries = this.__defaultOptions.tries || this.__nearingTries} =  typeof rapidityOrOptions === 'number' ? options : rapidityOrOptions
-		min = nearing(tries, rapidity, max)
+		min = nearing(this.__getTries(tries), rapidity, max)
 		return decimal ? this.r({max, min, decimal, resetAbove, resetFunc: this.reset.nearing}) : successMinimum ? this.r({max, min, successMinimum, resetAbove, resetFunc: this.reset.nearing}) : this.r({max, min, resetAbove, resetFunc: this.reset.nearing})
 	}
 	
@@ -188,19 +192,19 @@ class Randomizer implements Randomizer {
 			* @defaultValue 1
 			*/
 			rapidity?: number,
-			options?: SpecialRandomOptions & {successMinimum: never, decimal: never}): number
+			options?: SpecialRandomOptions & {successMinimum?: never, decimal?: never}): number
 	exponentialIncrease (
 		/** how fast do you want your minimum to increase? It's recommended to keep this below 10. 
 		* @defaultValue 1
 		*/
 		rapidity?: number,
-		options?: SpecialRandomOptions & {successMinimum: number, decimal: never}): boolean
+		options?: SpecialRandomOptions & {successMinimum: number, decimal?: never}): boolean
 	exponentialIncrease(
 				/** how fast do you want your minimum to increase? It's recommended to keep this below 10. 
 				* @defaultValue 1
 				*/
 				rapidity?: number,
-				options?: SpecialRandomOptions & {successMinimum: never, decimal: true | number}): string
+				options?: SpecialRandomOptions & {successMinimum?: never, decimal: true | number}): string
 	exponentialIncrease (rapidity: number = 1, {max = this.__defaultOptions.max || 1, min = this.__defaultOptions.min || 0, decimal = this.__defaultOptions.decimal, successMinimum = this.__defaultOptions.successMinimum, resetAbove = this.__defaultOptions.resetAbove }: SpecialRandomOptions & {successMinimum?: number, decimal?: true | number} = {}) {
 		min = (max - min)*(Math.pow(rapidity*this.__exponentialTries, 2))
 		const v = this.r({max, min})
